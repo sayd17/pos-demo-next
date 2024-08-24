@@ -4,59 +4,19 @@ import { useStateContext } from "../../context/ContextProvider";
 import ProductLabel from "../../components/quotation/ProductLabel";
 import QuotationSummary from "../../components/quotation/QuotationSummary";
 import QuotationField from "../../components/quotation/QuotationField";
-import { MAX_FILE_SIZE, currency } from "../../helpers/config";
+import { currency } from "../../helpers/config";
 import AlertService from "../api/AlertService";
 import Products from "../../components/quotation/Products";
+import { MAX_LENGTH, QuotationData } from "@/constants";
 
 export default function Quotations() {
   const [inputset, setInputSet] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [mail, setMail] = useState(null);
+  const [mail, setMail] = useState("");
   const { IP } = useStateContext();
   const route = "email-quotation-pdf";
 
-  const [quotationData, setQuotationData] = useState({
-    ship_to_label: "Ship To",
-    ship_from_label: "Ship From",
-    po_number_label: "PO Number",
-    po_number: "",
-    description_label: "Description",
-    quantity_label: "Quantity",
-    rate_label: "Rate",
-    discount_amount_label: "Discount",
-    vat_label: "Vat",
-    amount_label: "Amount",
-    action_label: "Action",
-    notes_label: "Notes",
-    notes: "",
-    terms_label: "Terms and Conditions",
-    terms_and_conditions: "",
-    sub_total_label: "Subtotal",
-    sub_total: 0,
-    total_label: "Total",
-    discount_label: "Discount",
-    tax_label: "Tax",
-    shipping_label: "Shipping",
-    amount_paid_label: "Amount Paid",
-    amount_paid: 0,
-    payment_terms_label: "Payment Terms",
-    payment_terms: "",
-    date_label: "Date",
-    due_date_label: "Due Date",
-    due_date: "",
-    balance_due_label: "Balance Due",
-    balance_due: 0,
-    quotation_name: "Quotation Name",
-    quotation_number: 1,
-    quotation_person: "",
-    ship_from: "",
-    total: 0,
-    tax: 0,
-    discount_amount: 0,
-    shipping: 0,
-    currency: "৳",
-    client_id: "",
-  });
+  const [quotationData, setQuotationData] = useState(QuotationData);
 
   useEffect(() => {
     let newQuotationData = { ...quotationData, client_id: IP };
@@ -88,15 +48,17 @@ export default function Quotations() {
       .then((res) => {
         if (!isEmptyObject(res?.data?.data)) {
           let data = res.data.data[0];
-          let keys = Object.keys(data);
-          const quotationProducts = "quotation_products";
-          keys.map((key) => {
-            if (key !== quotationProducts && data[key]) {
-              uploadData(key, data[key]);
-            } else if (key == "quotation_products") {
-              setInputSet(data[key]);
-            }
-          });
+          if (data) {
+            let keys = Object.keys(data);
+            const quotationProducts = "quotation_products";
+            keys.map((key) => {
+              if (key !== quotationProducts && data[key]) {
+                uploadData(key, data[key]);
+              } else if (key == "quotation_products") {
+                setInputSet(data[key]);
+              }
+            });
+          }
         }
       })
       .catch((err) => {
@@ -105,16 +67,29 @@ export default function Quotations() {
   };
 
   useEffect(() => {
-    if (IP !== null) {
+    if (IP) {
       getQuotationData(IP);
     }
   }, [IP]);
 
   const saveDefaults = () => {
-    let newQuotationData = { ...quotationData, client_id: IP, data: inputset };
+    if (!quotationData["ship_from"] || !quotationData["quotation_name"]) {
+      AlertService.warn(
+        `Please fill ${quotationData.ship_from_label}, quotation from and quotation name`
+      );
+      return;
+    }
+
+    let newQuotationData = {};
+
+    Object.keys(quotationData).map((key) => {
+      if (quotationData[key]) newQuotationData[key] = quotationData[key];
+    });
+
+    let allData = { ...newQuotationData, client_id: IP, data: inputset };
 
     axiosApi
-      .post(`/save-quotation`, newQuotationData)
+      .post(`/save-quotation`, allData)
       .then((response) => {
         AlertService.success("Saved Successfully");
       })
@@ -143,27 +118,47 @@ export default function Quotations() {
   useEffect(() => {
     let newSubTotal = 0;
     inputset.map((obj, index) => {
-      newSubTotal += obj.amount;
+      let len = obj.quantity.toString().length;
+      let len2 = obj.rate.toString().length;
+      if (len > MAX_LENGTH || len2 > MAX_LENGTH) {
+        AlertService.error(
+          `${quotationData.quantity_label} & ${quotationData.rate_label} should not be more than ${MAX_LENGTH} digits`
+        );
+      }
+      if (obj.quantity) newSubTotal += obj.amount;
     });
+    if (newSubTotal.toString().length > MAX_LENGTH) {
+      AlertService.error(
+        `${quotationData.sub_total_label} should not be more ${MAX_LENGTH} digits`
+      );
+      return;
+    }
     uploadData("sub_total", newSubTotal);
   }, [inputset]);
 
   useEffect(() => {
-    const { sub_total, tax, discount_amount, shipping } = quotationData;
+    const { sub_total, tax, discount, shipping } = quotationData;
     let newTotal =
-      Number(sub_total) +
-      Number(tax) -
-      Number(discount_amount) +
-      Number(shipping);
+      Number(sub_total) + Number(tax) - Number(discount) + Number(shipping);
     uploadData("total", newTotal);
   }, [
-    quotationData.discount_amount,
+    quotationData.discount,
     quotationData.sub_total,
     quotationData.shipping,
     quotationData.tax,
   ]);
 
   const uploadData = (name, value) => {
+    let len = value.toString().length;
+
+    // maximum length for quotation number is MAX_LENGTH
+    let maxLen = `${name === "quotation_number" ? MAX_LENGTH : 200}`;
+
+    if (len > Number(maxLen)) {
+      AlertService.error(`maximum input size exceeds for ${name}`);
+      value = value.substr(0, maxLen);
+    }
+
     setQuotationData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -172,6 +167,12 @@ export default function Quotations() {
 
   // store input value for products
   const handleInputValue = (index, targetValue, key) => {
+    let len = targetValue.toString().length;
+    if (len > 200) {
+      AlertService.error(`maximum input size exceeds`);
+      targetValue = targetValue.substr(0, 200);
+    }
+
     const formValue = [...inputset];
     formValue[index][key] = targetValue;
     setInputSet(formValue);
@@ -180,18 +181,28 @@ export default function Quotations() {
   useEffect(() => {
     let newBalanceDue =
       Number(quotationData.total) - Number(quotationData.amount_paid);
+    let changeAmount = newBalanceDue;
+    if (changeAmount > 0) changeAmount = 0;
+    uploadData("change_amount", -changeAmount);
+    if (newBalanceDue < 0) newBalanceDue = 0;
     uploadData("balance_due", newBalanceDue);
-  }, [quotationData.total, quotationData.amount_paid]);
+  }, [
+    quotationData.total,
+    quotationData.amount_paid,
+    quotationData.balance_due,
+  ]);
 
   const postFormData = () => {
     if (!quotationData["ship_from"] || !quotationData["quotation_name"]) {
-      AlertService.warn("Please fill ship from, ship to and quotation name");
+      AlertService.warn(
+        `Please fill ${quotationData.ship_from_label}, quotation from and quotation name`
+      );
       return;
     }
     const formData = new FormData();
-    Object.keys(quotationData).forEach((key) =>
-      formData.append(key, quotationData[key])
-    );
+    Object.keys(quotationData).forEach((key) => {
+      if (quotationData[key]) formData.append(key, quotationData[key]);
+    });
 
     if (selectedFile) formData.append("logo", selectedFile);
 
@@ -257,6 +268,7 @@ export default function Quotations() {
       </div>
       <QuotationSummary
         quotationData={quotationData}
+        setQuotationData={setQuotationData}
         uploadData={uploadData}
         inputset={inputset}
         handleInputValue={handleInputValue}

@@ -5,6 +5,7 @@ import PaperSize from "../../components/printLabel/PaperSize";
 
 export default function PrintLabel() {
   const [data, setData] = useState([]);
+  const [label, setLabel] = useState(null);
 
   const uploadData = (data) => {
     setData(data);
@@ -18,11 +19,11 @@ export default function PrintLabel() {
 
       <div className="horizontal-scrollable">
         <div className="row">
-          <ProductLabel />
-          <ProductInput uploadData={uploadData} />
+          <ProductLabel getLabel={(label) => setLabel(label)} />
+          <ProductInput uploadData={uploadData} label={label} />
         </div>
       </div>
-      <PaperSize productData={data} />
+      <PaperSize productData={data} label={label} />
     </>
   );
 }

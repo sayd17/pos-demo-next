@@ -526,15 +526,6 @@ export const currency = [
     name_plural: "Comorian francs",
   },
   {
-    symbol: "₩",
-    name: "South Korean Won",
-    symbol_native: "₩",
-    decimal_digits: 0,
-    rounding: 0,
-    code: "KRW",
-    name_plural: "South Korean won",
-  },
-  {
     symbol: "KD",
     name: "Kuwaiti Dinar",
     symbol_native: "د.ك.‏",

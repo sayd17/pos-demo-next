@@ -6,54 +6,16 @@ import InvoiceSummary from "../../components/invoice/InvoiceSummary";
 import InvoiceField from "../../components/invoice/InvoiceField";
 import AlertService from "../api/AlertService";
 import Products from "../../components/invoice/Products";
+import { InvoiceData, MAX_LENGTH } from "@/constants";
 
 export default function InvoiceGenerate() {
   const [inputset, setInputSet] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [mail, setMail] = useState(null);
+  const [mail, setMail] = useState("");
   const { IP } = useStateContext();
   const route = "email-invoice-pdf";
 
-  const [invoiceData, setInvoiceData] = useState({
-    ship_to_label: "Ship To",
-    ship_from_label: "Ship From",
-    po_number_label: "PO Number",
-    po_number: "",
-    description_label: "Description",
-    quantity_label: "Quantity",
-    rate_label: "Rate",
-    amount_label: "Amount",
-    action_label: "Action",
-    notes_label: "Notes",
-    notes: "",
-    terms_label: "Terms and Conditions",
-    terms_and_conditions: "",
-    sub_total_label: "Subtotal",
-    sub_total: 0,
-    total_label: "Total",
-    discount_label: "Discount",
-    tax_label: "Tax",
-    shipping_label: "Shipping",
-    amount_paid_label: "Amount Paid",
-    amount_paid: 0,
-    payment_terms_label: "Payment Terms",
-    payment_terms: "",
-    date_label: "Date",
-    due_date_label: "Due Date",
-    due_date: "",
-    balance_due_label: "Balance Due",
-    balance_due: 0,
-    invoice_name: "Invoice Name",
-    invoice_number: 1,
-    invoice_person: "",
-    ship_from: "",
-    total: 0,
-    tax: 0,
-    discount: 0,
-    shipping: 0,
-    currency: "৳",
-    client_id: "",
-  });
+  const [invoiceData, setInvoiceData] = useState(InvoiceData);
 
   useEffect(() => {
     let newInvoiceData = { ...invoiceData, client_id: IP };
@@ -73,15 +35,17 @@ export default function InvoiceGenerate() {
       .then((res) => {
         if (!isEmptyObject(res?.data?.data)) {
           let data = res.data.data[0];
-          let keys = Object.keys(data);
-          const invoiceProducts = "invoice_products";
-          keys.map((key) => {
-            if (key !== invoiceProducts && data[key]) {
-              uploadData(key, data[key]);
-            } else if (key == "invoice_products") {
-              setInputSet(data[key]);
-            }
-          });
+          if (data) {
+            let keys = Object.keys(data);
+            const invoiceProducts = "invoice_products";
+            keys.map((key) => {
+              if (key !== invoiceProducts && data[key]) {
+                uploadData(key, data[key]);
+              } else if (key == "invoice_products") {
+                setInputSet(data[key]);
+              }
+            });
+          }
         }
       })
       .catch((err) => {
@@ -90,16 +54,28 @@ export default function InvoiceGenerate() {
   };
 
   useEffect(() => {
-    if (IP !== null) {
+    if (IP) {
       getInvoiceData(IP);
     }
   }, [IP]);
 
   const saveDefaults = () => {
-    let newInvoiceData = { ...invoiceData, client_id: IP, data: inputset };
+    if (!invoiceData["ship_from"] || !invoiceData["invoice_name"]) {
+      AlertService.warn(
+        `Please fill ${invoiceData.ship_from_label}, invoice from and invoice name`
+      );
+      return;
+    }
+
+    let newInvoiceData = {};
+    Object.keys(invoiceData).map((key) => {
+      if (invoiceData[key]) newInvoiceData[key] = invoiceData[key];
+    });
+
+    let allData = { ...newInvoiceData, client_id: IP, data: inputset };
 
     axiosApi
-      .post(`/save-invoice`, newInvoiceData)
+      .post(`/save-invoice`, allData)
       .then((response) => {
         AlertService.success("Saved Successfully");
       })
@@ -126,8 +102,21 @@ export default function InvoiceGenerate() {
   useEffect(() => {
     let newSubTotal = 0;
     inputset.map((obj, index) => {
-      newSubTotal += obj.amount;
+      let len = obj.quantity.toString().length;
+      let len2 = obj.rate.toString().length;
+      if (len > MAX_LENGTH || len2 > MAX_LENGTH) {
+        AlertService.error(
+          `${invoiceData.quantity_label} & ${invoiceData.rate_label} should not be more than ${MAX_LENGTH} digits`
+        );
+      }
+      if (obj.quantity) newSubTotal += obj.amount;
     });
+    if (newSubTotal.toString().length > MAX_LENGTH) {
+      AlertService.error(
+        `${invoiceData.sub_total_label} should not be more ${MAX_LENGTH} digits`
+      );
+      return;
+    }
     uploadData("sub_total", newSubTotal);
   }, [inputset]);
 
@@ -144,6 +133,17 @@ export default function InvoiceGenerate() {
   ]);
 
   const uploadData = (name, value) => {
+    let len = value.toString().length;
+
+    // maximum length for invoice number is MAX_LENGTH
+    let maxLen = `${name === "invoice_number" ? MAX_LENGTH : 200}`;
+
+    if (len > maxLen) {
+      AlertService.error(`maximum input size exceeds for ${name}`);
+
+      value = value.substr(0, maxLen);
+    }
+
     setInvoiceData((prevData) => ({
       ...prevData,
       [name]: value,
@@ -152,6 +152,12 @@ export default function InvoiceGenerate() {
 
   // store input value for products
   const handleInputValue = (index, targetValue, key) => {
+    let len = targetValue.toString().length;
+    if (len > 200) {
+      AlertService.error(`maximum input size exceeds`);
+      targetValue = targetValue.substr(0, 200);
+    }
+
     const formValue = [...inputset];
     formValue[index][key] = targetValue;
     setInputSet(formValue);
@@ -160,18 +166,28 @@ export default function InvoiceGenerate() {
   useEffect(() => {
     let newBalanceDue =
       Number(invoiceData.total) - Number(invoiceData.amount_paid);
+    let changeAmount = newBalanceDue;
+    if (changeAmount > 0) changeAmount = 0;
+    uploadData("change_amount", -changeAmount);
+    if (newBalanceDue < 0) newBalanceDue = 0;
     uploadData("balance_due", newBalanceDue);
-  }, [invoiceData.total, invoiceData.amount_paid]);
+  }, [invoiceData.total, invoiceData.amount_paid, invoiceData.balance_due]);
 
   const postFormData = () => {
-    if (!invoiceData["ship_from"] || !invoiceData["invoice_name"]) {
-      AlertService.warn("Please fill ship from, ship to and invoice name");
+    if (
+      !invoiceData["ship_from"] ||
+      !invoiceData["invoice_name"] ||
+      !invoiceData["invoice_person"]
+    ) {
+      AlertService.warn(
+        `Please fill ${invoiceData.ship_from_label}, invoice from and invoice name`
+      );
       return;
     }
     const formData = new FormData();
-    Object.keys(invoiceData).forEach((key) =>
-      formData.append(key, invoiceData[key])
-    );
+    Object.keys(invoiceData).forEach((key) => {
+      if (invoiceData[key]) formData.append(key, invoiceData[key]);
+    });
 
     if (selectedFile) formData.append("logo", selectedFile);
 
@@ -241,9 +257,7 @@ export default function InvoiceGenerate() {
         invoiceData={invoiceData}
         uploadData={uploadData}
         inputset={inputset}
-        handleInputValue={handleInputValue}
-        setInputSet={setInputSet}
-        setSelectedFile={setSelectedFile}
+        setInvoiceData={setInvoiceData}
         setInput={setInput}
         saveDefaults={saveDefaults}
         clientId={invoiceData.client_id}
@@ -251,6 +265,7 @@ export default function InvoiceGenerate() {
         mail={mail}
         setMail={setMail}
         selectedFile={selectedFile}
+        setSelectedFile={setSelectedFile}
         submitButton={() => {
           postFormData();
         }}

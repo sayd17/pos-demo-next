@@ -1,7 +1,8 @@
 import AlertService from "../../pages/api/AlertService";
-import { sendMail } from "../SendMail";
+import { sendMail } from "../common/SendMail";
 import { MAX_FILE_SIZE, currency } from "../../helpers/config";
 import InputGroup from "../common/InputGroup";
+import CommonInput from "../common/CommonInput";
 import {
   PlusCircleIcon,
   XCircleIcon,
@@ -30,8 +31,8 @@ export default function QuotationField({
   const uploadAttachment = (e) => {
     e.preventDefault();
     const image = e.target.files[0];
-    const selectedImageSize = image.size / 1024;
-    if (!image.name.match(/\.(jpg|jpeg|png|gif)$/)) {
+    const selectedImageSize = image?.size / 1024 ?? "";
+    if (selectedImageSize && !image.name.match(/\.(jpg|jpeg|png|svg|gif)$/)) {
       AlertService.warn("Please Select a Valid Image");
       return false;
     } else if (image && selectedImageSize > MAX_FILE_SIZE) {
@@ -43,23 +44,27 @@ export default function QuotationField({
   return (
     <div className="row">
       <div className="d-block d-md-none mb-2">
-        <input
+        <CommonInput
           value={quotationData.quotation_name}
-          onChange={(event) => {
-            uploadData("quotation_name", event.target.value);
-          }}
-          className="invoice-input col-12 border-0"
+          uploadData={uploadData}
+          classes={"invoice-input col-12 border-1"}
+          input={"quotation_name"}
         />
       </div>
       <div className="d-block d-md-none mb-2">
-        <InputGroup
-          currency={"#"}
-          value={quotationData.quotation_number}
-          isDisabled={false}
-          border={"border-1"}
-          uploadData={uploadData}
-          field={"quotation_number"}
-        />
+        <div className="input-group">
+          <span className={`input-group-text border-1`}>#</span>
+
+          <input
+            type="number"
+            min="0"
+            disabled={false}
+            value={quotationData.quotation_number}
+            className={`invoice-input input-group-border bg-light form-control opacity-1 border-1`}
+            placeholder="0"
+            onChange={(e) => uploadData("quotation_number", e.target.value)}
+          />
+        </div>
       </div>
       <div className="col-md-5 col-12 col-sm-12 d-flex flex-column gap-3">
         <div>
@@ -176,23 +181,27 @@ export default function QuotationField({
       </div>
       <div className="d-flex col-md-5 col-12 flex-column gap-3">
         <div className="d-none d-md-block ">
-          <input
+          <CommonInput
             value={quotationData.quotation_name}
-            onChange={(event) => {
-              uploadData("quotation_name", event.target.value);
-            }}
-            className="invoice-input col-12 border-0"
+            uploadData={uploadData}
+            classes={"invoice-input col-12 border-1"}
+            input={"quotation_name"}
           />
         </div>
         <div className="d-none d-md-block">
-          <InputGroup
-            currency={"#"}
-            value={quotationData.quotation_number}
-            isDisabled={false}
-            border={"border-1"}
-            uploadData={uploadData}
-            field={"quotation_number"}
-          />
+          <div className="input-group">
+            <span className={`input-group-text border-1`}>#</span>
+
+            <input
+              type="number"
+              min="0"
+              disabled={false}
+              value={quotationData.quotation_number}
+              className={`invoice-input input-group-border bg-light form-control opacity-1 border-1`}
+              placeholder="0"
+              onChange={(e) => uploadData("quotation_number", e.target.value)}
+            />
+          </div>
         </div>
 
         <div>

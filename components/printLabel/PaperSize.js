@@ -3,24 +3,19 @@ import Select from "react-select";
 import { useState } from "react";
 import AlertService from "../../pages/api/AlertService";
 import axiosApi from "../../pages/api/axios-common";
+import { BarcodeType } from "@/constants";
 
-export default function PaperSize({ productData }) {
+export default function PaperSize({ productData, label }) {
   const [currentPaperSize, setCurrentPaperSize] = useState(null);
   const [error, setError] = useState("");
 
-  const paperSize = [
-    { value: "EAN2", label: "EAN2" },
-    { value: "C128", label: "C128" },
-    { value: "EAN5", label: "EAN5" },
-    { value: "EAN8", label: "EAN8" },
-    { value: "EAN13", label: "EAN13" },
-  ];
-
   useEffect(() => {
-    if (currentPaperSize?.label == "EAN13")
+    if (currentPaperSize?.label === "EAN13")
       setError("Max code length for EAN13 is 12");
-    else if (currentPaperSize?.label == "EAN8")
+    else if (currentPaperSize?.label === "EAN8")
       setError("Max code length for EAN8 is 7");
+    else if (currentPaperSize?.label === "UPCA")
+      setError("Max code length for UPCA is 11");
   }, [currentPaperSize]);
 
   const onSubmitHandler = () => {
@@ -29,11 +24,19 @@ export default function PaperSize({ productData }) {
       return;
     }
 
+    let flag = false;
+
     Object.keys(productData).map((key) => {
-      if (!productData[key].code) {
-        AlertService.error("Please give product code");
+      if (!productData[key].code || !productData[key].quantity) {
+        AlertService.error(`${label.code} and ${label.quantity} is required`);
+        flag = true;
+        return;
       }
     });
+
+    if (flag) {
+      return;
+    }
 
     const formData = new FormData();
 
@@ -73,7 +76,7 @@ export default function PaperSize({ productData }) {
           <div className="w-full mb-10">
             <Select
               placeholder="Select barcode type"
-              options={paperSize}
+              options={BarcodeType}
               value={currentPaperSize}
               onChange={(option) => {
                 setCurrentPaperSize(option);

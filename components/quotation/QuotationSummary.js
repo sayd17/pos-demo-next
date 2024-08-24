@@ -4,10 +4,12 @@ import {
   MailIcon,
   XCircleIcon,
 } from "@heroicons/react/outline";
-import { sendMail } from "../SendMail";
+import { useEffect } from "react";
+import { sendMail } from "../common/SendMail";
 import axiosApi from "../../pages/api/axios-common";
 import AlertService from "../../pages/api/AlertService";
 import InputGroup from "../common/InputGroup";
+import { InvoiceData, NotesTerms, QuotationData, Summary } from "@/constants";
 export default function QuotationSummary({
   quotationData,
   uploadData,
@@ -19,9 +21,45 @@ export default function QuotationSummary({
   saveDefaults,
   mail,
   setMail,
+  setQuotationData,
   route,
   selectedFile,
 }) {
+  useEffect(() => {
+    const { discount, tax, sub_total, discount_label, tax_label } =
+      quotationData;
+
+    if (discount > sub_total || tax > sub_total) {
+      AlertService.error(
+        `${discount_label}, & ${tax_label} should not be more than Subtotal`
+      );
+      uploadData("discount", sub_total);
+      uploadData("tax", sub_total);
+    }
+  }, [quotationData.discount, quotationData.tax, quotationData.sub_total]);
+
+  useEffect(() => {
+    const { shipping, shipping_label } = quotationData;
+
+    let len = shipping.toString().length;
+    if (len > 14) {
+      AlertService.error(`${shipping} should not be more than 14 digits`);
+      uploadData("shipping", shipping.substring(0, 14));
+    }
+  }, [quotationData.shipping]);
+
+  useEffect(() => {
+    const { amount_paid, amount_paid_label } = quotationData;
+
+    let len = amount_paid.toString().length;
+    if (len > 14) {
+      AlertService.error(
+        `${amount_paid_label} should not be more than 14 digits`
+      );
+      uploadData("amount_paid", amount_paid.substring(0, 14));
+    }
+  }, [quotationData.amount_paid]);
+
   // clear all data
   const clearButton = () => {
     let payload = { clientId: clientId };
@@ -29,225 +67,71 @@ export default function QuotationSummary({
       .post("/clear-quotation-data", payload)
       .then((res) => {
         AlertService.success("Cleared data successfully");
-        setInput();
-        Object.keys(quotationData).map((key) => {
-          if (key === "notes") uploadData("notes", "");
-          if (key === "terms_and_conditions")
-            uploadData("terms_and_conditions", "");
-          if (key === "ship_from") uploadData("ship_from", "");
-          if (key === "ship_to") uploadData("ship_to", "");
-          if (key === "currency") uploadData("currency", "Tk");
-          if (key === "due_date") uploadData("due_date", "");
-          if (key === "date") uploadData("date", "");
-          if (key === "quotation_person") uploadData("quotation_person", "");
-          if (key === "payment_terms") uploadData("payment_terms", "");
-          if (key === "po_number") uploadData("po_number", "");
-          if (key === "discount") uploadData("discount", 0);
-          if (key === "tax") uploadData("tax", 0);
-          if (key === "shipping") uploadData("shipping", 0);
-          if (key === "amount_paid") uploadData("amount_paid", 0);
-        });
-        setSelectedFile(null);
+        resetData();
       })
       .catch((err) => {
         console.log(err);
       });
   };
 
+  const resetData = () => {
+    QuotationData["client_id"] = clientId;
+    setInput();
+    setSelectedFile(null);
+    setQuotationData(QuotationData);
+  };
+
   return (
     <div className="pb-4">
       <div className="row d-flex flex-wrap ">
         <div className="d-flex flex-wrap col-12 col-md-6 flex-column gap-3">
-          <div className="d-flex flex-column gap-1">
-            <input
-              value={quotationData.notes_label}
-              onChange={(event) => {
-                uploadData("notes_label", event.target.value);
-              }}
-              className="col-12 invoice-input border col-12 col-lg-10 border-0"
-            />
-            <textarea
-              // ref={shipFrom}
-              id="notes"
-              name="notes"
-              rows="2"
-              cols="40"
-              value={quotationData.notes}
-              className="invoice-input bg-light w-full h-full opacity-10 cursor-pointer w-full col-12 col-md-10 border-gray-200 p-1 rounded outline-none focus:border-purple-500"
-              placeholder="Notes - any relevant information not already covered"
-              onChange={(e) => uploadData("notes", e.target.value)}
-            />
-          </div>
-          <div className="d-flex flex-column gap-1">
-            <input
-              value={quotationData.terms_label}
-              onChange={(event) => {
-                uploadData("terms_label", event.target.value);
-              }}
-              className="invoice-input border border-0 col-12 col-md-10"
-            />
-            <textarea
-              // ref={shipFrom}
-              id="terms_and_conditions"
-              name="terms_and_conditions"
-              rows="2"
-              value={quotationData.terms_and_conditions}
-              cols="40"
-              className="invoice-input bg-light w-full h-full opacity-10 cursor-pointer w-full col-12 col-md-10 border-gray-200 p-1 rounded outline-none focus:border-purple-500"
-              placeholder="Terms and conditions - late fees, payment methods, delivery schedule"
-              onChange={(e) =>
-                uploadData("terms_and_conditions", e.target.value)
-              }
-            />
-          </div>
+          {NotesTerms.map((item, index) => (
+            <div key={index} className="d-flex flex-column gap-1">
+              <input
+                value={quotationData[item.label]}
+                onChange={(event) => {
+                  uploadData(item.label, event.target.value);
+                }}
+                className="col-12 invoice-input border col-12 border-0"
+              />
+              <textarea
+                id="notes"
+                name="notes"
+                rows="2"
+                cols="40"
+                value={quotationData[item.value]}
+                className="invoice-input bg-light w-full h-full opacity-10 cursor-pointer w-full col-12 p-1 rounded outline-none"
+                placeholder="Notes - any relevant information not already covered"
+                onChange={(e) => uploadData(item.value, e.target.value)}
+              />
+            </div>
+          ))}
         </div>
-        <div className="d-flex col-12 col-md-4 col-xxl-4 flex-column gap-1">
-          <div className="row d-flex flex-end">
-            <div className="col-md-5">
-              <input
-                value={quotationData.sub_total_label}
-                onChange={(event) => {
-                  uploadData("sub_total_label", event.target.value);
-                }}
-                className="col-12 invoice-input my-1 label-start border border-0 p-2"
-              />
+        <div className="d-flex col-12 col-md-6 flex-column gap-1">
+          {Summary.map((item, index) => (
+            <div key={index} className="row">
+              <div className="col-md-5 p-md-0">
+                <input
+                  value={quotationData[item.label]}
+                  onChange={(event) => {
+                    uploadData(item.label, event.target.value);
+                  }}
+                  className="col-12 invoice-input my-1 label-start border border-0 p-2"
+                />
+              </div>
+
+              <div className="col-md-7">
+                <InputGroup
+                  inputSymbol={quotationData.currency}
+                  value={quotationData[item.value]}
+                  uploadData={uploadData}
+                  field={item.value}
+                  isDisabled={item.isDisabled}
+                  border={item.isDisabled ? "border-0" : "border-1"}
+                />
+              </div>
             </div>
-            <div className="col-md-7">
-              <InputGroup
-                currency={quotationData.currency}
-                value={quotationData.sub_total}
-                isDisabled={true}
-                border={"border-0"}
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="col-md-5">
-              <input
-                value={quotationData.discount_amount_label}
-                onChange={(event) => {
-                  uploadData("discount_amount_label", event.target.value);
-                }}
-                className="col-12 invoice-input my-1  label-start border border-0 p-2"
-              />
-            </div>
-            <div className="col-md-7">
-              <InputGroup
-                currency={quotationData.currency}
-                value={quotationData.discount_amount}
-                isDisabled={false}
-                border={"border-1"}
-                uploadData={uploadData}
-                field={"discount_amount"}
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="col-md-5">
-              <input
-                type="text"
-                value={quotationData.tax_label}
-                onChange={(event) => {
-                  uploadData("tax_label", event.target.value);
-                }}
-                className="col-12 invoice-input my-1 label-start border border-0 p-2"
-              />
-            </div>
-            <div className="col-md-7">
-              <InputGroup
-                currency={quotationData.currency}
-                value={quotationData.tax}
-                isDisabled={false}
-                border={"border-1"}
-                uploadData={uploadData}
-                field={"tax"}
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="col-md-5">
-              <input
-                value={quotationData.shipping_label}
-                onChange={(event) => {
-                  uploadData("shipping_label", event.target.value);
-                }}
-                className="col-12 invoice-input my-1 label-start border border-0 p-2"
-              />
-            </div>
-            <div className="col-md-7">
-              <InputGroup
-                currency={quotationData.currency}
-                value={quotationData.shipping}
-                isDisabled={false}
-                border={"border-1"}
-                uploadData={uploadData}
-                field={"shipping"}
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="col-md-5">
-              <input
-                value={quotationData.total_label}
-                onChange={(event) => {
-                  uploadData("total_label", event.target.value);
-                }}
-                className="col-12 invoice-input my-1 label-start border border-0 p-2"
-              />
-            </div>
-            <div className="col-md-7">
-              <InputGroup
-                currency={quotationData.currency}
-                value={quotationData.total}
-                isDisabled={true}
-                border={"border-0"}
-                uploadData={uploadData}
-                field={"total"}
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="col-md-5">
-              <input
-                value={quotationData.amount_paid_label}
-                onChange={(event) => {
-                  uploadData("amount_paid_label", event.target.value);
-                }}
-                className="col-12 invoice-input my-1 label-start border border-0 p-2"
-              />
-            </div>
-            <div className="col-md-7">
-              <InputGroup
-                currency={quotationData.currency}
-                value={quotationData.amount_paid}
-                isDisabled={false}
-                border={"border-1"}
-                uploadData={uploadData}
-                field={"amount_paid"}
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="col-md-5">
-              <input
-                value={quotationData.balance_due_label}
-                onChange={(event) => {
-                  uploadData("balance_due_label", event.target.value);
-                }}
-                className="col-12 invoice-input label-start border border-0 p-2"
-              />
-            </div>
-            <div className="col-md-7">
-              <InputGroup
-                currency={quotationData.currency}
-                value={quotationData.balance_due}
-                isDisabled={true}
-                border={"border-0"}
-                uploadData={uploadData}
-                field={"balance_due"}
-              />
-            </div>
-          </div>
+          ))}
         </div>
       </div>
       <div>

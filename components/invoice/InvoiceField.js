@@ -1,9 +1,9 @@
 import { useState } from "react";
 import AlertService from "../../pages/api/AlertService";
-import { sendMail } from "../SendMail";
+import { sendMail } from "../common/SendMail";
 import { MAX_FILE_SIZE, currency } from "../../helpers/config";
 import InputGroup from "../common/InputGroup";
-import BasicInput from "../common/BasicInput";
+import CommonInput from "../common/CommonInput";
 import {
   PlusCircleIcon,
   XCircleIcon,
@@ -32,8 +32,8 @@ export default function InvoiceField({
   const uploadAttachment = (e) => {
     e.preventDefault();
     const image = e.target.files[0];
-    const selectedImageSize = image.size / 1024;
-    if (!image.name.match(/\.(jpg|jpeg|png|gif)$/)) {
+    const selectedImageSize = image?.size / 1024 ?? "";
+    if (selectedImageSize && !image.name.match(/\.(jpg|jpeg|png|svg|gif)$/)) {
       AlertService.warn("Please Select a Valid Image");
       return false;
     } else if (image && selectedImageSize > MAX_FILE_SIZE) {
@@ -45,23 +45,27 @@ export default function InvoiceField({
   return (
     <div className="row">
       <div className="d-block d-md-none mb-2">
-        <input
-          value={invoiceData.invoice_name}
-          onChange={(event) => {
-            uploadData("invoice_name", event.target.value);
-          }}
-          className="invoice-input col-12 border-0"
+        <CommonInput
+          value={invoiceData.invoice_name || ""}
+          uploadData={uploadData}
+          classes={"col-12 border-1"}
+          input={"invoice_name"}
         />
       </div>
       <div className="d-block d-md-none mb-2">
-        <InputGroup
-          currency={"#"}
-          value={invoiceData.invoice_number}
-          isDisabled={false}
-          border={"border-1"}
-          uploadData={uploadData}
-          field={"invoice_number"}
-        />
+        <div className="input-group">
+          <span className={`input-group-text border-1`}>#</span>
+
+          <input
+            type="number"
+            min="0"
+            disabled={false}
+            value={invoiceData.invoice_number}
+            className={`invoice-input input-group-border bg-light form-control opacity-1 border-1`}
+            placeholder="0"
+            onChange={(e) => uploadData("invoice_number", e.target.value)}
+          />
+        </div>
       </div>
       <div className="col-md-5 col-12 col-sm-12 d-flex flex-column gap-3">
         <div>
@@ -123,7 +127,7 @@ export default function InvoiceField({
         <div className="d-flex flex-column">
           <input
             name="invoice_person"
-            value={invoiceData.invoice_person}
+            value={invoiceData.invoice_person || ""}
             onChange={(e) => uploadData("invoice_person", e.target.value)}
             className="invoice-input bg-light  border-1 border-gray-200 p-2 rounded outline-none focus:border-purple-500"
             placeholder="Who is this invoice from? (required)"
@@ -134,32 +138,34 @@ export default function InvoiceField({
           <div className="d-flex flex-column gap-1">
             <input
               name="shipFromLabel"
-              value={invoiceData.ship_from_label}
+              value={
+                invoiceData.ship_from_label ? invoiceData.ship_from_label : ""
+              }
               onChange={(event) => {
                 uploadData("ship_from_label", event.target.value);
               }}
               className="invoice-input border-0"
             />
             <input
-              value={invoiceData.ship_from}
-              className="invoice-input bg-light w-full border-1 border-gray-200 p-2 rounded outline-none focus:border-purple-500"
+              value={invoiceData.ship_from || ""}
+              className="invoice-input bg-light w-full border-1 p-2 rounded outline-none"
               onChange={(e) => uploadData("ship_from", e.target.value)}
               placeholder="Who is this invoice from? (required)"
             />
           </div>
 
           <div className="d-flex flex-column gap-1">
-            <BasicInput
-              value={invoiceData.ship_to_label}
+            <CommonInput
+              value={invoiceData.ship_to_label || ""}
               uploadData={uploadData}
               classes={`invoice-input border-0`}
               input={`ship_to_label`}
             />
 
-            <BasicInput
-              value={invoiceData.ship_to}
+            <CommonInput
+              value={invoiceData.ship_to || ""}
               uploadData={uploadData}
-              classes={`invoice-input bg-light w-full col-lg-12 border-1 border-gray-200 p-2 rounded outline-none focus:border-purple-500`}
+              classes={`invoice-input bg-light w-full col-lg-12 border-1 p-2 rounded outline-none`}
               input={`ship_to`}
               placeholder={"(optional)"}
             />
@@ -168,28 +174,32 @@ export default function InvoiceField({
       </div>
       <div className="d-flex col-md-5 col-12 flex-column gap-3">
         <div className="d-none d-md-block">
-          <input
-            value={invoiceData.invoice_name}
-            onChange={(event) => {
-              uploadData("invoice_name", event.target.value);
-            }}
-            className="invoice-input col-12 border-0"
+          <CommonInput
+            value={invoiceData.invoice_name || ""}
+            uploadData={uploadData}
+            classes={"invoice-input col-12 border-1"}
+            input={"invoice_name"}
           />
         </div>
         <div className="d-none d-md-block">
-          <InputGroup
-            currency={"#"}
-            value={invoiceData.invoice_number}
-            isDisabled={false}
-            border={"border-1"}
-            uploadData={uploadData}
-            field={"invoice_number"}
-          />
+          <div className="input-group">
+            <span className={`input-group-text border-1`}>#</span>
+
+            <input
+              type="number"
+              min="0"
+              disabled={false}
+              value={invoiceData.invoice_number}
+              className={`invoice-input input-group-border bg-light form-control opacity-1 border-1`}
+              placeholder="0"
+              onChange={(e) => uploadData("invoice_number", e.target.value)}
+            />
+          </div>
         </div>
 
         <div>
           <input
-            value={invoiceData.date_label}
+            value={invoiceData.date_label || ""}
             type="text"
             onChange={(event) => {
               uploadData("date_label", event.target.value);
@@ -198,15 +208,15 @@ export default function InvoiceField({
           />
           <input
             type="date"
-            value={invoiceData.data}
+            value={invoiceData.date}
             onChange={(e) => uploadData("date", e.target.value)}
-            className="invoice-input bg-light float-end label-start ms-md-1 ms-none col-12 col-md-5 p-2 border-1 border-gray-200 rounded outline-none focus:border-purple-500"
+            className="invoice-input bg-light float-end label-start ms-md-1 ms-none col-12 col-md-5 p-2 border-1 rounded outline-none"
           />
         </div>
 
         <div>
           <input
-            value={invoiceData.payment_terms_label}
+            value={invoiceData.payment_terms_label || ""}
             type="text"
             onChange={(event) => {
               uploadData("payment_terms_label", event.target.value);
@@ -215,7 +225,7 @@ export default function InvoiceField({
           />
           <input
             type="text"
-            value={invoiceData.payment_terms}
+            value={invoiceData.payment_terms || ""}
             className="invoice-input bg-light col-md-5 float-end  label-start  ms-none col-12 col-md-4 p-2 border-1 border-gray-200 rounded outline-none"
             onChange={(e) => uploadData("payment_terms", e.target.value)}
           />
@@ -223,7 +233,7 @@ export default function InvoiceField({
 
         <div>
           <input
-            value={invoiceData.due_date_label}
+            value={invoiceData.due_date_label || ""}
             type="text"
             onChange={(event) => {
               uploadData("due_date_label", event.target.value);
@@ -240,7 +250,7 @@ export default function InvoiceField({
 
         <div className="mb-2 mb-md-none">
           <input
-            value={invoiceData.po_number_label}
+            value={invoiceData.po_number_label || ""}
             type="text"
             onChange={(event) => {
               uploadData("po_number_label", event.target.value);

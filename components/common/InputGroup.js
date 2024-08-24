@@ -1,7 +1,7 @@
 import React from "react";
 
 export default function InputGroup({
-  currency,
+  inputSymbol,
   value,
   isDisabled,
   border,
@@ -11,15 +11,21 @@ export default function InputGroup({
   return (
     <>
       <div className="input-group">
-        <span className="input-group-text border-0">{currency}</span>
+        <span className={`input-group-text ${border}`}>{inputSymbol}</span>
 
         <input
           type="number"
           disabled={isDisabled}
-          value={value}
-          className={`invoice-input bg-light rounded form-control opacity-1 ${border}`}
+          value={value ? value : 0}
+          className={`invoice-input input-group-border bg-light form-control opacity-1 ${border}`}
           placeholder="0"
-          onChange={(e) => uploadData(field, e.target.value)}
+          onChange={(e) => {
+            let newValue = e.target.value;
+            if (newValue > 0) {
+              newValue = newValue.replace(/^0+/, "");
+            }
+            uploadData(field, newValue);
+          }}
         />
       </div>
     </>

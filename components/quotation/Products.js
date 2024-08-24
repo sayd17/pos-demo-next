@@ -1,6 +1,8 @@
 import React from "react";
 import { TrashIcon, PlusIcon } from "@heroicons/react/outline";
 import InputGroup from "../common/InputGroup";
+import AlertService from "@/pages/api/AlertService";
+import { MAX_PRODUCT_LENGTH } from "@/constants";
 
 export default function Products({
   quotationData,
@@ -12,13 +14,32 @@ export default function Products({
   const calculateAmount = (index, event, field) => {
     let newValue = event.target.value;
 
+    // remove leading zeroes
+    if (newValue > 0) {
+      newValue = newValue.replace(/^0+/, "");
+    }
+
     const updatedInputSet = [...inputset];
     const item = updatedInputSet[index];
-    if (field === "quantity") {
-      updatedInputSet[index].amount = item.rate * newValue;
-    } else if (field === "rate") {
-      updatedInputSet[index].amount = newValue * item.quantity;
+
+    if (newValue < 0 || !newValue) {
+      newValue = 0;
+      let inputLabel = `${field}_label`;
+      AlertService.error(
+        `${quotationData[inputLabel]} can not be negative or empty`
+      );
     }
+
+    let oppositeField = `${field === "rate" ? "quantity" : "rate"}`;
+    let amount = item[oppositeField] * newValue;
+    if (amount.toString().length > MAX_PRODUCT_LENGTH) {
+      AlertService.error(
+        `${quotationData.amount_label} should not be more than ${MAX_PRODUCT_LENGTH} digits`
+      );
+      return;
+    }
+    updatedInputSet[index].amount = amount;
+
     updatedInputSet[index][field] = newValue;
     setInputSet(updatedInputSet);
   };
@@ -55,7 +76,7 @@ export default function Products({
                     value={item.description}
                     type="text"
                     placeholder="Description of item/service..."
-                    className="invoice-input col-12 bg-light p-2 border-1 border-gray-200 rounded"
+                    className="invoice-input col-12 bg-light p-2 border-1  rounded"
                     onChange={(e) =>
                       handleInputValue(index, e.target.value, "description")
                     }
@@ -64,8 +85,9 @@ export default function Products({
                 <div className="col-4 col-md-2">
                   <input
                     value={item.quantity}
+                    min="0"
                     type="number"
-                    className="invoice-input col-12 bg-light p-2 border-1 border-gray-200 rounded "
+                    className="invoice-input col-12 bg-light p-2 border-1  rounded "
                     onChange={(event) =>
                       calculateAmount(index, event, "quantity")
                     }
@@ -80,7 +102,7 @@ export default function Products({
                     <input
                       value={item.rate}
                       type="number"
-                      className="invoice-input form-control bg-light border-gray-200 rounded "
+                      className="invoice-input form-control bg-light input-group-border"
                       onChange={(event) =>
                         calculateAmount(index, event, "rate")
                       }
@@ -96,8 +118,8 @@ export default function Products({
                     <input
                       value={item.amount}
                       type="number"
-                      className="invoice-input form-control border-0 bg-light border-gray-200 rounded "
-                      disabled="true"
+                      className="invoice-input form-control border-0 bg-light  rounded "
+                      disabled={true}
                       onChange={(event) =>
                         calculateAmount(index, event, "amount")
                       }
@@ -125,7 +147,7 @@ export default function Products({
         <button
           type="button"
           style={{ backgroundColor: "#0070ba" }}
-          className="btn m-2 border-1 text-white border-gray-200 rounded outline-none focus:border-purple-500"
+          className="btn m-2 border-1 text-white  rounded outline-none focus:border-purple-500"
           onClick={addRow}
         >
           <span>
